@@ -9,7 +9,7 @@ code for a Spring Batch and distributed data processing talk.
   - step scopes 
   - repositories
   - step flows
-  - batch partitioning/chunking ?  [GitHub - joshlong/batch-spring-boot-starter: provides auto configuration for distributed computing idioms with Spring Batch](https://github.com/joshlong/batch-spring-boot-starter)
+  - batch partitioning/chunking ?  here's my [batch-spring-boot-starter: provides auto configuration for distributed computing idioms with Spring Batch](https://github.com/joshlong/batch-spring-boot-starter)
 
 
 ## graalvm 
