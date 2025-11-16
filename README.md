@@ -5,11 +5,11 @@ code for a Spring Batch and distributed data processing talk.
 
 - will look at Spring Batch, first, but also look at projects like Spring Integration, JobRunr, GraalVM, and Flowable  
 - Spring Batch 
-  - jobs 
-  - step scopes 
-  - repositories
-  - step flows
-  - batch partitioning/chunking ?  here's my [batch-spring-boot-starter: provides auto configuration for distributed computing idioms with Spring Batch](https://github.com/joshlong/batch-spring-boot-starter)
+ - jobs 
+ - step scopes 
+ - repositories
+ - step flows
+ - batch partitioning/chunking? here's my [batch-spring-boot-starter: provides auto configuration for distributed computing idioms with Spring Batch](https://github.com/joshlong/batch-spring-boot-starter)
 
 
 ## graalvm 
