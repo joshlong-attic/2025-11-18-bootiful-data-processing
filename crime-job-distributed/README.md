@@ -24,5 +24,5 @@ when do we run this thing? we could do in one of two ways, and we'll show them b
 * jobrunr, to run on a cluster at a fixed time, with durable tracking and so on
 
 ## act 4.
-we want to generate a .pdf report for each district, but that takes time. let's use remote chunking so that the work could be divided across a number of worker nodes. we'll bring in my easy-spring-batch-remotechunking library see [the examples here](https://github.com/joshlong/batch-spring-boot-starter)
+we want to generate a .pdf report for each district, but that takes time. let's use remote chunking so that the work could be divided across a number of worker nodes. we'll bring in my [easy-spring-batch-remotechunking](https://github.com/joshlong/easy-spring-batch-remotechunking) library. See [the examples here](https://github.com/joshlong/batch-spring-boot-starter).
 
