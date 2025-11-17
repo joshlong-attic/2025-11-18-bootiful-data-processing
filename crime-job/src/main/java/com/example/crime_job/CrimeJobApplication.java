@@ -22,6 +22,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.VirtualThreadTaskExecutor;
@@ -90,8 +91,11 @@ class LoadCsvStepConfiguration {
         @Override
         public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
             hints.reflection().registerType(Crime.class, MemberCategory.values());
+            hints.resources().registerResource(DATA_CSV_RESOURCE);
         }
     }
+
+    static final Resource DATA_CSV_RESOURCE = new ClassPathResource("data.csv");
 
     @Bean
     JdbcBatchItemWriter<Crime> crimesCsvItemWriter(DataSource dataSource) {
@@ -115,10 +119,10 @@ class LoadCsvStepConfiguration {
     }
 
     @Bean
-    FlatFileItemReader<Crime> crimeCsvFlatFileItemReader(@Value("classpath:/data.csv") Resource csv) {
+    FlatFileItemReader<Crime> crimeCsvFlatFileItemReader() {
         return new FlatFileItemReaderBuilder<Crime>()
                 .name("crimeCsvFlatFileItemReader")
-                .resource(csv)
+                .resource(DATA_CSV_RESOURCE)
                 .linesToSkip(1)
                 .fieldSetMapper(fieldSet -> new Crime(fieldSet.readInt("ARR_DISTRICT", -1),
                         fieldSet.readInt("ARR_YEAR", -1), fieldSet.readInt("ARR_MONTH", -1), fieldSet.readString("FBI_CODE")))
