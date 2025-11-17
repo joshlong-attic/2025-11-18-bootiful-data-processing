@@ -9,11 +9,8 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
-import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
-import org.springframework.batch.item.database.JdbcCursorItemReader;
 import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
-import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.batch.repeat.RepeatStatus;
@@ -28,17 +25,11 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.VirtualThreadTaskExecutor;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @SpringBootApplication
 public class CrimeJobApplication {
@@ -59,12 +50,13 @@ class IngestJobConfiguration {
     @Bean
     Job ingestJob(JobRepository repository,
                   ResetDbStepConfiguration resetDbStepConfiguration,
-                  LoadCsvStepConfiguration s1,
-                  SummarizationStepConfiguration s2) {
+                  LoadCsvStepConfiguration s1
+//                  SummarizationStepConfiguration s2
+    ) {
         return new JobBuilder("ingestJob", repository)
                 .start(resetDbStepConfiguration.resetDbStep(null, null, null))
                 .next(s1.loadCsvStep(null, null, null))
-                .next(s2.summarizationStep(null, null, null, null))
+//                .next(s2.summarizationStep(null, null, null, null))
                 .incrementer(new RunIdIncrementer())
                 .build();
     }
@@ -91,6 +83,20 @@ class ResetDbStepConfiguration {
                 }, tx)
                 .build();
     }
+}
+
+@Configuration
+class SummaryReportStepConfiguration {
+
+//    @Bean
+    Step summaryReportStep(JobRepository repository, PlatformTransactionManager tx) {
+        return new StepBuilder("summaryReportStep", repository)
+
+                .chunk(100, tx)
+                .build();
+    }
+
+
 }
 
 @Configuration
@@ -152,60 +158,6 @@ class LoadCsvStepConfiguration {
     }
 }
 
-
-@Configuration
-class SummarizationStepConfiguration {
-
-    record CrimeBreakdown(int district, Map<Integer, Integer> yearToCrimes) {
-    }
-
-    @Component
-    static class CrimeBreakdownRowMapper
-            implements RowMapper<CrimeBreakdown> {
-
-        private final Map<Integer, Map<Integer, Integer>> map = new ConcurrentHashMap<>();
-
-        @Override
-        public CrimeBreakdown mapRow(ResultSet rs, int rowNum) throws SQLException {
-            var district = rs.getInt("district");
-            var cityToStat = this.map.computeIfAbsent(district, _ -> new ConcurrentHashMap<>());
-            cityToStat.put(rs.getInt("year"), rs.getInt("total_crimes"));
-            var cb = new CrimeBreakdown(district, map.get(district));
-            IO.println(cb);
-            return cb;
-        }
-    }
-
-    @Bean
-    ItemWriter<CrimeBreakdown> crimeBreakdownItemWriter() {
-        return chunk -> chunk.forEach(IO::println);
-    }
-
-    @Bean
-    JdbcCursorItemReader<CrimeBreakdown> crimeBreakdownJdbcBatchItemWriter(
-            CrimeBreakdownRowMapper rowMapper,
-            DataSource dataSource) {
-        return new JdbcCursorItemReaderBuilder<CrimeBreakdown>()
-                .name("crimeBreakdownJdbcBatchItemWriter")
-                .dataSource(dataSource)
-                .sql("select * from crime_breakdown")
-                .rowMapper(rowMapper)
-                .build();
-    }
-
-    @Bean
-    Step summarizationStep(JobRepository jobRepository,
-                           JdbcCursorItemReader<CrimeBreakdown> crimeBreakdownJdbcCursorItemReader,
-                           ItemWriter<CrimeBreakdown> crimeBreakdownItemWriter,
-                           PlatformTransactionManager tx) {
-        return new StepBuilder("summarizationStep", jobRepository)
-                .<CrimeBreakdown, CrimeBreakdown>chunk(1000, tx)
-                .reader(crimeBreakdownJdbcCursorItemReader)
-                .writer(crimeBreakdownItemWriter)
-                .build();
-    }
-
-}
 
 record Crime(int district, int year, int month, String fbiCode) {
 }

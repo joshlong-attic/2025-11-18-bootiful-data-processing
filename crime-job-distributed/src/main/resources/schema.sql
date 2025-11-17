@@ -10,9 +10,23 @@ create table if not exists crime_data
 drop view if exists crime_breakdown;
 
 create view crime_breakdown as
-SELECT district,
-       year,
-       COUNT(*) AS total_crimes
-FROM crime_data
-GROUP BY district, year
-ORDER BY district, year;
+SELECT
+    district,
+    total_crimes,
+    CASE
+        WHEN crime_tertile = 1 THEN 'green'
+        WHEN crime_tertile = 2 THEN 'yellow'
+        WHEN crime_tertile = 3 THEN 'red'
+        END AS category
+FROM (
+         SELECT
+             district,
+             COUNT(*) AS total_crimes,
+             NTILE(3) OVER (ORDER BY COUNT(*)) AS crime_tertile
+         FROM
+            crime_data
+         GROUP BY
+             district
+     ) AS crime_counts
+ORDER BY
+    total_crimes;
