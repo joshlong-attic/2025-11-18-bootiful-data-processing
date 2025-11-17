@@ -134,7 +134,7 @@ class LoadCsvStepConfiguration {
     Step loadCsvStep(TaskExecutor taskExecutor, PlatformTransactionManager tx, JobRepository jobRepository) {
         return new StepBuilder("csvToTableStep", jobRepository)
                 .<Crime, Crime>chunk(1000, tx)
-                .reader(this.crimeCsvFlatFileItemReader(null))
+                .reader(this.crimeCsvFlatFileItemReader())
                 .writer(this.crimesCsvItemWriter(null))
                 .taskExecutor(taskExecutor)
                 .build();
