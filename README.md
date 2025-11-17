@@ -15,15 +15,7 @@ code for a Spring Batch and distributed data processing talk.
 
 here's what we could use as a demo: [the NYC taxi trips database](https://www1.nyc.gov/site/tlc/about/tlc-trip-record-data.page)
 
-	•	Open data, CSV, parquet, millions of rows
-	•	Super intuitive schema: pickup time, dropoff, trip distance, fare, tip, payment type
-	•	Easy insights:
-	•	Average fare per borough
-	•	Surge trends by hour
-	•	Tip percentage distribution
-	•	Longest trips
-	•	Partitionable by: month, day, or even borough
-
+or we could use [this data here](https://data.cityofchicago.org/Public-Safety/Crimes-2001-to-Present/ijzp-q8t2/about_data)
 
 
 
