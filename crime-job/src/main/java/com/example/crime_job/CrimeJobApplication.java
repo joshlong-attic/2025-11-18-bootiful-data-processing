@@ -1,5 +1,8 @@
 package com.example.crime_job;
 
+import org.springframework.aot.hint.MemberCategory;
+import org.springframework.aot.hint.RuntimeHints;
+import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.job.builder.JobBuilder;
@@ -17,6 +20,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.batch.JobExecutionEvent;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.io.Resource;
 import org.springframework.core.task.TaskExecutor;
@@ -78,8 +82,16 @@ class ResetDbStepConfiguration {
 }
 
 @Configuration
+@ImportRuntimeHints(LoadCsvStepConfiguration.Hints.class)
 class LoadCsvStepConfiguration {
 
+    static class Hints implements RuntimeHintsRegistrar {
+
+        @Override
+        public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
+            hints.reflection().registerType(Crime.class, MemberCategory.values());
+        }
+    }
 
     @Bean
     JdbcBatchItemWriter<Crime> crimesCsvItemWriter(DataSource dataSource) {
