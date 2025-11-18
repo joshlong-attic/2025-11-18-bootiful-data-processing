@@ -18,7 +18,6 @@ import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.core.step.tasklet.TaskletStep;
-import org.springframework.batch.item.Chunk;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.JdbcCursorItemReader;
@@ -55,6 +54,7 @@ import java.time.Duration;
 public class CrimeJobApplication {
 
     public static void main(String[] args) {
+        System.setProperty("spring.amqp.deserialization.trust.all" , "true") ;
         SpringApplication.run(CrimeJobApplication.class, args);
     }
 }
@@ -115,6 +115,7 @@ class SummaryReportStepConfiguration {
     record CrimeSummary(int district, String category, int crimes) {
 
     }
+
     @Bean
     JdbcCursorItemReader<CrimeSummary> crimeSummaryJdbcCursorItemReader(
             DataSource db, CrimeSummaryRowMapper summaryRowMapper) {
@@ -163,7 +164,9 @@ class SummaryReportStepConfiguration {
     }
 
     @Bean
-    IntegrationFlow inboundIntegrationFlow(ConnectionFactory cf, @LeaderInboundChunkChannel MessageChannel in) {
+    IntegrationFlow inboundIntegrationFlow(
+            ConnectionFactory cf,
+            @LeaderInboundChunkChannel MessageChannel in) {
         return IntegrationFlow//
                 .from(Amqp.inboundAdapter(cf, "replies"))//
                 .channel(in)//
