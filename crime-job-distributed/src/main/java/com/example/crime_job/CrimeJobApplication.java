@@ -1,5 +1,13 @@
 package com.example.crime_job;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.joshlong.batch.remotechunking.leader.LeaderChunkStep;
+import com.joshlong.batch.remotechunking.leader.LeaderInboundChunkChannel;
+import com.joshlong.batch.remotechunking.leader.LeaderItemWriter;
+import com.joshlong.batch.remotechunking.leader.LeaderOutboundChunkChannel;
+import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
@@ -9,8 +17,13 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.core.step.tasklet.TaskletStep;
+import org.springframework.batch.item.Chunk;
+import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
+import org.springframework.batch.item.database.JdbcCursorItemReader;
 import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
+import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.batch.repeat.RepeatStatus;
@@ -25,10 +38,17 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.VirtualThreadTaskExecutor;
+import org.springframework.integration.amqp.dsl.Amqp;
+import org.springframework.integration.dsl.IntegrationFlow;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.messaging.MessageChannel;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Duration;
 
 @SpringBootApplication
@@ -50,13 +70,13 @@ class IngestJobConfiguration {
     @Bean
     Job ingestJob(JobRepository repository,
                   ResetDbStepConfiguration resetDbStepConfiguration,
-                  LoadCsvStepConfiguration s1
-//                  SummarizationStepConfiguration s2
+                  LoadCsvStepConfiguration s1,
+                  SummaryReportStepConfiguration s2
     ) {
         return new JobBuilder("ingestJob", repository)
                 .start(resetDbStepConfiguration.resetDbStep(null, null, null))
                 .next(s1.loadCsvStep(null, null, null))
-//                .next(s2.summarizationStep(null, null, null, null))
+                .next(s2.summaryReportStep(null, null, null, null))
                 .incrementer(new RunIdIncrementer())
                 .build();
     }
@@ -88,14 +108,105 @@ class ResetDbStepConfiguration {
 @Configuration
 class SummaryReportStepConfiguration {
 
-//    @Bean
-    Step summaryReportStep(JobRepository repository, PlatformTransactionManager tx) {
-        return new StepBuilder("summaryReportStep", repository)
 
-                .chunk(100, tx)
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+
+    record CrimeSummary(int district, String category, int crimes) {
+
+    }
+    @Bean
+    JdbcCursorItemReader<CrimeSummary> crimeSummaryJdbcCursorItemReader(
+            DataSource db, CrimeSummaryRowMapper summaryRowMapper) {
+        return new JdbcCursorItemReaderBuilder<CrimeSummary>()
+                .name("crimeSummaryJdbcCursorItemReader")
+                .rowMapper(summaryRowMapper)
+                .dataSource(db)
+                .sql(" select * from crime_breakdown  ")
                 .build();
     }
 
+    @Component
+    static class CrimeSummaryRowMapper implements RowMapper<CrimeSummary> {
+
+        @Override
+        public CrimeSummary mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return new CrimeSummary(rs.getInt("district"),
+                    rs.getString("category"), rs.getInt("total_crimes"));
+        }
+
+    }
+
+    @Bean
+    @LeaderChunkStep
+    TaskletStep summaryReportStep(
+            JobRepository repository,
+            JdbcCursorItemReader<CrimeSummary> crimeSummaryJdbcCursorItemReader,
+            PlatformTransactionManager transactionManager,
+            @LeaderItemWriter ItemWriter<String> itemWriter) {
+
+//        var writer = (ItemWriter<String>) chunk -> chunk.forEach(IO::println);
+        return new StepBuilder("summaryReportStepConfiguration", repository)//
+                .<CrimeSummary, String>chunk(100, transactionManager)//
+                .reader(crimeSummaryJdbcCursorItemReader)//
+                .processor(this::jsonFor)//
+                .writer(itemWriter)//
+                .build();
+    }
+
+    @Bean
+    IntegrationFlow outboundIntegrationFlow(@LeaderOutboundChunkChannel MessageChannel out, AmqpTemplate amqpTemplate) {
+        return IntegrationFlow //
+                .from(out)//
+                .handle(Amqp.outboundAdapter(amqpTemplate).routingKey("requests"))//
+                .get();
+    }
+
+    @Bean
+    IntegrationFlow inboundIntegrationFlow(ConnectionFactory cf, @LeaderInboundChunkChannel MessageChannel in) {
+        return IntegrationFlow//
+                .from(Amqp.inboundAdapter(cf, "replies"))//
+                .channel(in)//
+                .get();
+    }
+
+    private String jsonFor(Object o) {
+        try {
+            return this.objectMapper.writeValueAsString(o);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+
+@Configuration
+class RabbitConfiguration {
+
+    @Bean
+    org.springframework.amqp.core.Queue requestQueue() {
+        return new org.springframework.amqp.core.Queue("requests", false);
+    }
+
+    @Bean
+    org.springframework.amqp.core.Queue repliesQueue() {
+        return new Queue("replies", false);
+    }
+
+    @Bean
+    TopicExchange exchange() {
+        return new TopicExchange("remote-chunking-exchange");
+    }
+
+    @Bean
+    Binding repliesBinding(TopicExchange exchange) {
+        return BindingBuilder
+                .bind(repliesQueue()).to(exchange).with("replies");
+    }
+
+    @Bean
+    Binding requestBinding(TopicExchange exchange) {
+        return BindingBuilder.bind(requestQueue()).to(exchange).with("requests");
+    }
 
 }
 
