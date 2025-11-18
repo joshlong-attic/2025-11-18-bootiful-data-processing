@@ -106,7 +106,17 @@ class ResetDbStepConfiguration {
 }
 
 @Configuration
+@ImportRuntimeHints(SummaryReportStepConfiguration.Hints.class)
 class SummaryReportStepConfiguration {
+
+    static class Hints implements RuntimeHintsRegistrar {
+
+        @Override
+        public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
+            hints.reflection().registerType(CrimeSummary.class, MemberCategory.values());
+        }
+    }
+
 
 
     private final ObjectMapper objectMapper = new ObjectMapper();
