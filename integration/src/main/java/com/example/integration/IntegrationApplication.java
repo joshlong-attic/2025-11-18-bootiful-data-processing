@@ -18,6 +18,9 @@ public class IntegrationApplication {
         SpringApplication.run(IntegrationApplication.class, args);
     }
 
+    // gregor hohpe +  bobby woolf
+    // enterprise integration patterns
+
     @Bean
     IntegrationFlow fileIntegrationFlow(@Value("file://${user.home}/Desktop/in") File directory) {
         var log = LoggerFactory.getLogger(getClass());
@@ -28,6 +31,7 @@ public class IntegrationApplication {
                     headers.forEach((k, v) -> log.info(k + ": " + v));
                     return null;
                 })
+                // .handle (Ftp.outboundAdapter(...))
                 .get();
     }
 }
